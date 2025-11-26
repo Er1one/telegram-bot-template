@@ -1,9 +1,14 @@
 [project]
-name = "bot-template"
+name = "telegram-bot-template"
 version = "0.1.0"
-description = "Production-ready Telegram bot template with aiogram 3.x, PostgreSQL, Redis, and i18n support"
+description = "Production-ready Telegram bot template with aiogram 3.x, PostgreSQL, Redis, and i18n support."
 readme = "README.md"
 requires-python = ">=3.13"
+
+authors = [
+    { name = "er1one", email = "er1one@vk.com" }
+]
+
 dependencies = [
     "aerich>=0.9.2",
     "aiogram>=3.22.0",
@@ -17,3 +22,8 @@ dependencies = [
     "tortoise-orm[asyncpg]>=0.25.1",
     "uvicorn>=0.38.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Er1one/telegram-bot-template"
+Repository = "https://github.com/Er1one/telegram-bot-template.git"
+Issues = "https://github.com/Er1one/telegram-bot-template/issues"
