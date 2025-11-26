@@ -154,6 +154,7 @@ from tortoise import Model, fields
 class Chat(Model):
     id = fields.BigIntField(primary_key=True)
     title = fields.CharField(max_length=255)
+    
     class Meta:
         table = "chats"
 ```
