@@ -1,0 +1,19 @@
+[project]
+name = "bot-template"
+version = "0.1.0"
+description = "Production-ready Telegram bot template with aiogram 3.x, PostgreSQL, Redis, and i18n support"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aerich>=0.9.2",
+    "aiogram>=3.22.0",
+    "aiogram-i18n>=1.4",
+    "fastapi>=0.121.2",
+    "fluent-runtime>=0.4.0",
+    "loguru>=0.7.3",
+    "msgspec>=0.19.0",
+    "pydantic-settings>=2.12.0",
+    "redis>=7.0.1",
+    "tortoise-orm[asyncpg]>=0.25.1",
+    "uvicorn>=0.38.0",
+]
