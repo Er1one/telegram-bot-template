@@ -16,7 +16,7 @@ Production-ready шаблон для Telegram ботов на aiogram 3.x с Pos
 
 ```bash
 # Клонируйте и настройте окружение
-git clone <repo-url> && cd bot-template
+git clone https://github.com/Er1one/telegram-bot-template.git && cd bot-template
 cp .env.example .env
 
 # Отредактируйте .env (BOT_TOKEN, пароли, WEBHOOK_URL)
@@ -77,7 +77,7 @@ make db-backup              # Бэкап БД
 ```bash
 # 1. Измените модель в bot/models/
 # 2. Создайте миграцию
-make aerich migrate --name "add_user_field"
+make aerich migrate
 
 # 3. Примените
 make aerich upgrade
