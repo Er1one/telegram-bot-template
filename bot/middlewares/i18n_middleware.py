@@ -1,7 +1,6 @@
 from pathlib import Path
 from aiogram_i18n import I18nMiddleware
 from aiogram_i18n.cores import FluentRuntimeCore
-from loguru import logger
 
 from core.config import settings
 from managers import I18nManager
