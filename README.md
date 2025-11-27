@@ -162,7 +162,7 @@ class Chat(Model):
 Импортируйте в `bot/models/__init__.py` и создайте миграцию:
 
 ```bash
-make aerich migrate --name "add_chat_model"
+make aerich migrate
 make aerich upgrade
 ```
 
