@@ -22,7 +22,6 @@ uv.lock
 .env
 .claude
 .claude/
-CLAUDE.md
 .envrc
 .venv
 env/
