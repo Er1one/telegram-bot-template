@@ -58,7 +58,7 @@ def setup_logging() -> None:
 
     _setup_intercept_handler()
 
-    logger.info("Система логирования успешно настроена")
+    logger.info("The logging system has been successfully configured")
 
 
 def _setup_intercept_handler() -> None:

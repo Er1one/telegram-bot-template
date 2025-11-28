@@ -11,7 +11,6 @@ router = APIRouter()
 async def webhook_endpoint(update: dict):
     """
     Обработчик webhook от Telegram.
-    Токен проверяется через path в URL, FastAPI автоматически валидирует маршрут.
     """
     telegram_update = Update(**update)
     await dispatcher.feed_webhook_update(bot, telegram_update)

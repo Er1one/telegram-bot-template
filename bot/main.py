@@ -19,23 +19,23 @@ async def set_webhook():
     old_webhook: WebhookInfo = await bot.get_webhook_info()
     
     if old_webhook.url == webhook_path:
-        logger.info("Актуальный webhook уже установлен!")
+        logger.info("The current webhook is already setup!")
         return
     
     await bot.set_webhook(webhook_path)
-    logger.info(f"Webhook установлен: {webhook_url}/{settings.bot_token.get_secret_value()[0:6]}...")
+    logger.info(f"Webhook setup: {webhook_url}/{settings.bot_token.get_secret_value()[0:6]}...")
     
 
 async def register_middlewares():
     # Регистрируем middleware на уровне диспетчера (один раз для всех типов событий)
     user_middleware = UserRegistrationMiddleware()
     dispatcher.update.outer_middleware(user_middleware)
-    logger.debug("UserRegistration middleware зарегистрирован")
+    logger.debug("UserRegistration middleware registered")
 
     # Регистрируем i18n middleware
     i18n_middleware.setup(dispatcher=dispatcher)
     await i18n_middleware.core.startup()
-    logger.debug("i18n middleware зарегистрирован")
+    logger.debug("i18n middleware registered")
 
 
 async def on_startup():    
@@ -52,7 +52,7 @@ async def on_shutdown():
     """Действия при остановке"""
     await bot.session.close()
     await DatabaseManager.close()
-    logger.info("Бот остановлен")
+    logger.info("Bot stopped")
 
 
 if __name__ == "__main__":
