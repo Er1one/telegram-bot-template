@@ -3,7 +3,7 @@ import uvicorn
 from loguru import logger
 
 from managers import DatabaseManager
-from middlewares import i18n_middleware, UserRegistrationMiddleware
+from middlewares import AntiFloodMiddleware, i18n_middleware, UserRegistrationMiddleware
 from routes import webhook_router
 from core import setup_logging
 from core.config import settings
@@ -27,10 +27,15 @@ async def set_webhook():
     
 
 async def register_middlewares():
-    # Регистрируем middleware на уровне диспетчера (один раз для всех типов событий)
+    # Регистрируем middleware на уровне диспетчера
     user_middleware = UserRegistrationMiddleware()
     dispatcher.update.outer_middleware(user_middleware)
     logger.debug("UserRegistration middleware registered")
+    
+    # Регистрируем AntiFloodMiddleware для предотвращения флуда
+    flood_middleware = AntiFloodMiddleware(redis=dispatcher.storage.redis, min_interval=0.3) # 0.3 секунды между действиями
+    dispatcher.update.outer_middleware(flood_middleware)
+    logger.debug("AntiFloodMiddleware middleware registered")
 
     # Регистрируем i18n middleware
     i18n_middleware.setup(dispatcher=dispatcher)

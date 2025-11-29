@@ -58,3 +58,6 @@ chat-stats =
     👥 Members: { $member_count }
     💬 Chat: { $chat_title }
     🆔 Chat ID: <code>{ $chat_id }</code>
+
+# Flood
+antiflood-warning = ⚠️ Wait a bit before pressing it again.
