@@ -1,7 +1,9 @@
 """Сервис для рассылки сообщений пользователям"""
 
 import asyncio
+import time
 from typing import List
+from collections import deque
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter, TelegramBadRequest
@@ -11,152 +13,172 @@ from models import BotUser
 from utils import Template
 
 
+class RateLimiter:
+    def __init__(self, max_rate: int = 20):
+        self.max_rate = max_rate
+        self.timestamps = deque()
+        self.lock = asyncio.Lock()
+    
+    async def acquire(self):
+        async with self.lock:
+            now = time.time()
+            
+            while self.timestamps and now - self.timestamps[0] >= 1.0:
+                self.timestamps.popleft()
+            
+            if len(self.timestamps) >= self.max_rate:
+                sleep_time = 1.0 - (now - self.timestamps[0])
+                if sleep_time > 0:
+                    await asyncio.sleep(sleep_time)
+                    now = time.time()
+                    while self.timestamps and now - self.timestamps[0] >= 1.0:
+                        self.timestamps.popleft()
+            
+            self.timestamps.append(now)
+
+
 class BroadcastService:
-    """Сервис массовой рассылки сообщений"""
+    @staticmethod
+    async def _send_to_user(
+        template_with_bot: Template,
+        user_id: int,
+        rate_limiter: RateLimiter,
+        user_obj=None
+    ) -> dict:
+        await rate_limiter.acquire()
+        
+        try:
+            await template_with_bot.send(user_id)
+            return {'status': 'success', 'user_id': user_id}
+
+        except TelegramForbiddenError:
+            logger.debug(f"User {user_id} blocked the bot")
+            if user_obj:
+                user_obj.is_banned = True
+                await user_obj.save()
+            return {'status': 'blocked', 'user_id': user_id}
+
+        except TelegramRetryAfter as e:
+            logger.warning(f"Rate limit for user {user_id}, skipping")
+            return {'status': 'failed', 'user_id': user_id}
+
+        except TelegramBadRequest as e:
+            logger.error(f"Failed to send to user {user_id}: {e}")
+            return {'status': 'failed', 'user_id': user_id}
+
+        except Exception as e:
+            logger.error(f"Unexpected error sending to user {user_id}: {e}")
+            return {'status': 'failed', 'user_id': user_id}
 
     @staticmethod
     async def broadcast_template(
         bot: Bot,
         template: Template,
         exclude_banned: bool = True,
-        delay: float = 0.05,
-        batch_size: int = 100
+        batch_size: int = 100,
+        concurrent_limit: int = 30,
+        max_rate: int = 20
     ) -> dict:
-        """
-        Рассылает шаблон сообщения всем пользователям с батчингом.
-
-        Args:
-            bot: Экземпляр бота
-            template: Шаблон сообщения для рассылки
-            exclude_banned: Исключить заблокированных пользователей
-            delay: Задержка между отправками (секунды)
-            batch_size: Размер батча для загрузки пользователей из БД
-
-        Returns:
-            Статистика рассылки
-        """
         query = BotUser.all()
         if exclude_banned:
             query = query.filter(is_banned=False)
 
-        # Получаем только ID для экономии памяти
         total = await query.count()
         logger.info(f"Starting broadcast to {total} users")
 
-        success = 0
-        failed = 0
-        blocked = 0
+        success = failed = blocked = 0
         template_with_bot = template.with_bot(bot)
+        semaphore = asyncio.Semaphore(concurrent_limit)
+        rate_limiter = RateLimiter(max_rate=max_rate)
 
-        # Батчинг для экономии памяти на больших базах
-        offset = 0
-        while offset < total:
-            users = await query.offset(offset).limit(batch_size).all()
+        async def send_with_limits(user):
+            async with semaphore:
+                return await BroadcastService._send_to_user(
+                    template_with_bot, user.id, rate_limiter, user
+                )
+
+        last_id = 0
+        while True:
+            users = await query.filter(id__gt=last_id).order_by('id').limit(batch_size).all()
             if not users:
                 break
 
-            for user in users:
-                try:
-                    await template_with_bot.send(user.id)
+            results = await asyncio.gather(
+                *[send_with_limits(user) for user in users],
+                return_exceptions=True
+            )
+
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.error(f"Exception in broadcast: {result}")
+                    failed += 1
+                elif result['status'] == 'success':
                     success += 1
-
-                    if delay > 0:
-                        await asyncio.sleep(delay)
-
-                except TelegramForbiddenError:
+                elif result['status'] == 'blocked':
                     blocked += 1
-                    logger.debug(f"User {user.id} blocked the bot")
-                    user.is_banned = True
-                    await user.save()
-
-                except TelegramRetryAfter as e:
-                    logger.warning(f"Rate limit hit, waiting {e.retry_after} seconds")
-                    await asyncio.sleep(e.retry_after)
-                    try:
-                        await template_with_bot.send(user.id)
-                        success += 1
-                    except Exception:
-                        failed += 1
-
-                except TelegramBadRequest as e:
+                else:
                     failed += 1
-                    logger.error(f"Failed to send to user {user.id}: {e}")
 
-                except Exception as e:
-                    failed += 1
-                    logger.error(f"Unexpected error sending to user {user.id}: {e}")
-
-            offset += batch_size
-
-        stats = {
-            "total": total,
-            "success": success,
-            "failed": failed,
-            "blocked": blocked
-        }
+            last_id = users[-1].id
 
         logger.info(
             f"Broadcast completed: {success}/{total} successful, "
             f"{blocked} blocked, {failed} failed"
         )
 
-        return stats
+        return {
+            "total": total,
+            "success": success,
+            "failed": failed,
+            "blocked": blocked
+        }
 
     @staticmethod
     async def broadcast_to_users(
         bot: Bot,
         user_ids: List[int],
         template: Template,
-        delay: float = 0.05
+        concurrent_limit: int = 30,
+        max_rate: int = 20
     ) -> dict:
-        """
-        Рассылает сообщение конкретным пользователям.
-
-        Args:
-            bot: Экземпляр бота
-            user_ids: Список ID пользователей
-            template: Шаблон сообщения
-            delay: Задержка между отправками (секунды)
-
-        Returns:
-            Статистика рассылки
-        """
         total = len(user_ids)
         logger.info(f"Starting broadcast to {total} specific users")
 
-        success = 0
-        failed = 0
-
         template_with_bot = template.with_bot(bot)
+        semaphore = asyncio.Semaphore(concurrent_limit)
+        rate_limiter = RateLimiter(max_rate=max_rate)
 
-        for user_id in user_ids:
-            try:
-                await template_with_bot.send(user_id)
-                success += 1
+        async def send_with_limits(user_id):
+            async with semaphore:
+                return await BroadcastService._send_to_user(
+                    template_with_bot, user_id, rate_limiter
+                )
 
-                if delay > 0:
-                    await asyncio.sleep(delay)
+        results = await asyncio.gather(
+            *[send_with_limits(user_id) for user_id in user_ids],
+            return_exceptions=True
+        )
 
-            except TelegramRetryAfter as e:
-                logger.warning(f"Rate limit hit, waiting {e.retry_after} seconds")
-                await asyncio.sleep(e.retry_after)
-
-                try:
-                    await template_with_bot.send(user_id)
-                    success += 1
-                except Exception:
-                    failed += 1
-
-            except Exception as e:
+        success = failed = blocked = 0
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"Exception in broadcast: {result}")
                 failed += 1
-                logger.error(f"Failed to send to user {user_id}: {e}")
+            elif result['status'] == 'success':
+                success += 1
+            elif result['status'] == 'blocked':
+                blocked += 1
+            else:
+                failed += 1
 
-        stats = {
+        logger.info(
+            f"Broadcast completed: {success}/{total} successful, "
+            f"{blocked} blocked, {failed} failed"
+        )
+
+        return {
             "total": total,
             "success": success,
-            "failed": failed
+            "failed": failed,
+            "blocked": blocked
         }
-
-        logger.info(f"Broadcast completed: {success}/{total} successful, {failed} failed")
-
-        return stats

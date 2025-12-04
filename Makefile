@@ -1,4 +1,4 @@
-.PHONY: help dev prod build up down logs restart clean shell aerich ps rebuild db-backup clean-all
+.PHONY: help dev prod build up down logs restart clean shell aerich ps rebuild db-backup clean-all test
 
 # Загружаем переменные из .env, включая COMPOSE_ENV
 include .env
@@ -38,6 +38,9 @@ help:
 	@echo "База данных (Aerich):"
 	@echo "  make aerich-init            - Инициализировать Aerich"
 	@echo "  make aerich ARGS            - Выполнить команду Aerich"
+	@echo ""
+	@echo "Тестирование:"
+	@echo "  make test                   - Запустить тесты"
 	@echo ""
 	@echo "Примеры:"
 	@echo "  make aerich migrate         - Создать миграцию"
@@ -138,6 +141,15 @@ db-backup:
 	@mkdir -p ./backups
 	$(COMPOSE) exec -T database pg_dump -U $(PG_USER) $(PG_DATABASE) > ./backups/backup_$(COMPOSE_ENV)_$$(date +%Y%m%d_%H%M%S).sql
 	@echo "✅ Бэкап создан в ./backups/"
+
+# Тестирование
+test:
+	@echo "🧪 Запуск тестов..."
+	@echo "📦 Установка зависимостей для тестирования..."
+	@uv pip install -q pytest pytest-asyncio pytest-cov 2>/dev/null || (echo "⚠️  Не удалось установить зависимости. Установите uv: pip install uv" && exit 1)
+	@echo "▶️  Запуск pytest..."
+	@uv run pytest tests/ -v --cov=bot/services --cov-report=term-missing --cov-report=html
+	@echo "✅ Тесты завершены! HTML отчет: htmlcov/index.html"
 
 # Позволяет передавать аргументы без ошибок
 %:

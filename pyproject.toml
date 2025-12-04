@@ -23,6 +23,13 @@ dependencies = [
     "uvicorn>=0.38.0",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/Er1one/telegram-bot-template"
 Repository = "https://github.com/Er1one/telegram-bot-template.git"
