@@ -9,6 +9,15 @@ from models import BotUser
 
 class UserService:
     """Сервис для работы с пользователями (Redis + БД)"""
+    
+    @staticmethod
+    async def set_user_banned(user_id: int, banned: bool) -> BotUser:
+        bot_user = await BotUser.get_or_none(id=user_id)
+        
+        if bot_user:
+            if bot_user.is_banned is not banned:
+                bot_user.is_banned = banned
+                await bot_user.save()
 
     @staticmethod
     async def register_user(user: User) -> BotUser:
