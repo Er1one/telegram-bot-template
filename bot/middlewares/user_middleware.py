@@ -6,6 +6,10 @@ from aiogram.types import TelegramObject, User
 from services import UserService
 
 
+# Сервисный ID Телеграмма. Используется для сообщение вроде "Обновлена фотография", "Отправлен подарок"
+TG_SERVICE_USER_ID = 777000
+
+
 class UserRegistrationMiddleware(BaseMiddleware):
     """Middleware для автоматической регистрации пользователей"""
 
@@ -17,7 +21,7 @@ class UserRegistrationMiddleware(BaseMiddleware):
     ) -> Any:
         user: User | None = data.get("event_from_user")
 
-        if user and not user.is_bot:
+        if user and not user.is_bot and user.id != TG_SERVICE_USER_ID:
             # Автоматически регистрируем или обновляем пользователя
             await UserService.register_user(user)
 
